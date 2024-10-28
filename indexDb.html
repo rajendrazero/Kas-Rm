@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Keuangan Kas</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f2f5; }
+        .container { max-width: 800px; margin: auto; padding: 20px; }
+        h1 { text-align: center; }
+
+        /* Navbar */
+        .navbar { text-align: center; margin-bottom: 20px; }
+        .navbar button { padding: 10px 20px; margin: 5px; cursor: pointer; transition: background-color 0.3s; }
+        .navbar button:hover { background-color: #e0e0e0; }
+
+        /* Card Style */
+        .card { background-color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 20px; margin-top: 20px; border-radius: 8px; }
+        .card h2 { margin-bottom: 20px; }
+
+        /* Form Style */
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group textarea, .form-group input, .form-group select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+
+        /* Table Style */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f0f2f5; }
+        tr:hover { background-color: #f9f9f9; }
+
+        /* Pagination Style */
+        .pagination { display: flex; justify-content: center; margin-top: 20px; }
+        .pagination button { padding: 5px 10px; margin: 0 5px; cursor: pointer; }
+        .pagination button:hover { background-color: #e0e0e0; }
+
+        /* Total Style */
+        .total-container { display: flex; justify-content: space-between; margin-top: 20px; }
+        .total-card { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; width: 30%; margin-top: 20px; }
+        .total-card h3 { margin: 10px 0; color: #333; }
+        .total-card p { font-size: 1.2em; font-weight: bold; }
+
+        /* Visibility Control */
+        .hidden { display: none; }
+        
+
+        /* Confirmation Message Style */
+        .confirmation-message { color: green; margin-top: 10px; }
+
+        /* Media Queries for Responsiveness */
+        @media (max-width: 600px) {
+            .total-container { flex-direction: column; }
+            .total-card { width: 100%; margin: 10px 0; }
+            
+            .navbar{
+              padding: 5px 10px;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Manajemen Keuangan Kas</h1>
+        <div class="confirmation-message" id="confirmationMessage"></div>
+
+        <!-- Navbar -->
+        <div class="navbar">
+            <button onclick="showSection('inputSection')">Input Transaksi</button>
+            <button onclick="showSection('importSection')">Impor Transaksi</button>
+            <button onclick="showSection('incomeTableSection')">Daftar Pemasukan</button>
+            <button onclick="showSection('expenseTableSection')">Daftar Pengeluaran</button>
+            <button onclick="showSection('totalSection')">Perhitungan Total</button>
+            <button onclick="exportToExcel()">Ekspor ke Excel</button>
+        </div>
+
+        <!-- Form Impor Transaksi -->
+        <div id="importSection" class="hidden card">
+            <h2>Impor Transaksi dari Excel</h2>
+            <input type="file" id="fileInput" accept=".xlsx, .xls">
+            <button onclick="importFromExcel()">Impor</button>
+            <div class="confirmation-message" id="importMessage"></div>
+        </div>
+
+        <!-- Form Input Transaksi -->
+        <div id="inputSection" class="card">
+            <h2>Tambah/Edit Transaksi</h2>
+            <div class="form-group">
+                <label for="description">Deskripsi</label>
+                <textarea id="description" placeholder="Deskripsi Transaksi" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="amount">Banyak Uang</label>
+                <input type="number" id="amount" placeholder="Masukkan jumlah transaksi" min="500">
+            </div>
+            <div class="form-group">
+                <label for="type">Tipe</label>
+                <select id="type">
+                    <option value="income">Pemasukan</option>
+                    <option value="expense">Pengeluaran</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button onclick="addTransaction()">Tambah Transaksi</button>
+                <button onclick="clearInput()">Bersihkan</button>
+            </div>
+        </div>
+
+        <!-- Tabel Daftar Pemasukan -->
+        <div id="incomeTableSection" class="hidden card">
+            <h2>Daftar Pemasukan</h2>
+            <input type="text" id="searchIncome" placeholder="Cari pemasukan..." onkeyup="searchTransaction('income')">
+            <table id="incomeTable">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Tanggal</th>
+                        <th>Deskripsi</th>
+                        <th>Jumlah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data pemasukan akan ditambahkan di sini -->
+                </tbody>
+            </table>
+            <div id="incomePagination" class="pagination"></div>
+        </div>
+
+        <!-- Tabel Daftar Pengeluaran -->
+        <div id="expenseTableSection" class="hidden card">
+            <h2>Daftar Pengeluaran</h2>
+            <input type="text" id="searchExpense" placeholder="Cari pengeluaran..." onkeyup="searchTransaction('expense')">
+            <table id="expenseTable">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Tanggal</th>
+                        <th>Deskripsi</th>
+                        <th>Jumlah</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data pengeluaran akan ditambahkan di sini -->
+                </tbody>
+            </table>
+            <div id="expensePagination" class="pagination"></div>
+        </div>
+
+        <!-- Ringkasan Total -->
+        <div id="totalSection" class="hidden total-container">
+            <div class="total-card">
+                <h3>Total Pemasukan</h3>
+                <p id="totalIncome">Rp 0</p>
+            </div>
+            <div class="total-card">
+                <h3>Total Pengeluaran</h3>
+                <p id="totalExpense">Rp 0</p>
+            </div>
+            <div class="total-card">
+                <h3>Saldo</h3>
+                <p id="totalBalance">Rp 0</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let db;
+let transactions = [];
+const dbName = "KasDB";
+const storeName = "transactions";
+const itemsPerPage = 10;
+let currentEditingTransactionId = null;
+let currentIncomePage = 1;
+let currentExpensePage = 1;
+let searchKeyword = '';
+
+function initIndexedDB() {
+    const request = indexedDB.open(dbName, 1);
+    request.onerror = (event) => { console.error("Database error:", event.target.error); };
+    request.onsuccess = (event) => {
+        db = event.target.result;
+        renderTransactions();
+    };
+    request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName, { keyPath: "id", autoIncrement: true });
+        }
+    };
+}
+
+// Menambah atau mengedit transaksi
+function addTransaction() {
+    const date = new Date().toLocaleDateString('id-ID');
+    const description = document.getElementById('description').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const type = document.getElementById('type').value;
+
+    if (description && amount > 0) {
+        const transaction = { date, description, amount, type };
+        const transactionStore = db.transaction([storeName], "readwrite").objectStore(storeName);
+        
+        if (currentEditingTransactionId) {
+            transaction.id = currentEditingTransactionId;
+            transactionStore.put(transaction);
+            showConfirmationMessage('Transaksi berhasil diperbarui!');
+        } else {
+            transactionStore.add(transaction);
+            showConfirmationMessage('Transaksi berhasil ditambahkan!');
+        }
+
+        clearInput();
+        renderTransactions();
+    } else {
+        alert('Mohon isi deskripsi dan jumlah yang valid.');
+    }
+}
+
+// Fungsi untuk Mengedit Transaksi
+function editTransaction(id) {
+    const transactionStore = db.transaction([storeName]).objectStore(storeName);
+    const request = transactionStore.get(id);
+
+    request.onsuccess = (event) => {
+        const transaction = event.target.result;
+        document.getElementById('description').value = transaction.description;
+        document.getElementById('amount').value = transaction.amount;
+        document.getElementById('type').value = transaction.type;
+        currentEditingTransactionId = id;
+        showSection('inputSection');
+    };
+}
+
+// Hapus Transaksi dari IndexedDB
+function deleteTransaction(id) {
+    const transactionStore = db.transaction([storeName], "readwrite").objectStore(storeName);
+    transactionStore.delete(id).onsuccess = () => {
+        renderTransactions();
+        showConfirmationMessage('Transaksi berhasil dihapus!');
+    };
+}
+
+// Render transactions
+function renderTransactions() {
+    renderTableData("income");
+    renderTableData("expense");
+    calculateTotals();
+}
+
+function renderTableData(type) {
+    const transactionStore = db.transaction([storeName]).objectStore(storeName);
+    const request = transactionStore.getAll();
+    request.onsuccess = () => {
+        transactions = request.result;
+        const filteredTransactions = transactions.filter(t => t.type === type && 
+            (t.description.toLowerCase().includes(searchKeyword) || t.amount.toString().includes(searchKeyword))
+        );
+
+        const startIndex = (type === 'income' ? currentIncomePage - 1 : currentExpensePage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const displayedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+        displayTableData(displayedTransactions, type, startIndex);
+        renderPagination(filteredTransactions.length, type);
+    };
+}
+
+function displayTableData(transactions, type, startIndex) {
+    const tableBody = document.querySelector(`#${type}Table tbody`);
+    tableBody.innerHTML = '';
+    transactions.forEach((t, index) => {
+        const row = tableBody.insertRow();
+        row.insertCell(0).innerText = startIndex + index + 1;  // Nomor berurutan
+        row.insertCell(1).innerText = t.date;
+        row.insertCell(2).innerText = t.description;
+        row.insertCell(3).innerText = `Rp ${t.amount}`;
+        row.insertCell(4).innerHTML = `<button onclick="editTransaction(${t.id})">Edit</button>
+                                       <button onclick="deleteTransaction(${t.id})">Hapus</button>`;
+    });
+}
+
+// Render pagination
+function renderPagination(totalItems, type) {
+    const paginationElement = document.getElementById(`${type}Pagination`);
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    paginationElement.innerHTML = '';
+    for (let i = 1; i <= totalPages; i++) {
+        const button = document.createElement('button');
+        button.innerText = i;
+        button.onclick = () => changePage(i, type);
+        if (i === (type === 'income' ? currentIncomePage : currentExpensePage)) button.disabled = true;
+        paginationElement.appendChild(button);
+    }
+}
+
+function changePage(page, type) {
+    if (type === 'income') currentIncomePage = page;
+    else currentExpensePage = page;
+    renderTableData(type);
+}
+
+function calculateTotals() {
+    const incomeTotal = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balance = incomeTotal - expenseTotal;
+    document.getElementById('totalIncome').innerText = `Rp ${incomeTotal}`;
+    document.getElementById('totalExpense').innerText = `Rp ${expenseTotal}`;
+    document.getElementById('totalBalance').innerText = `Rp ${balance}`;
+}
+
+function searchTransaction(type) {
+    searchKeyword = document.getElementById(`search${type.charAt(0).toUpperCase() + type.slice(1)}`).value.toLowerCase();
+    currentIncomePage = 1;
+    currentExpensePage = 1;
+    renderTableData(type);
+}
+
+function clearInput() {
+    document.getElementById('description').value = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('type').value = 'income';
+    currentEditingTransactionId = null;
+}
+
+function showSection(sectionId) {
+    const sections = ['importSection', 'inputSection', 'incomeTableSection', 'expenseTableSection', 'totalSection'];
+    sections.forEach(id => {
+        document.getElementById(id).classList.toggle('hidden', id !== sectionId);
+    });
+    renderTransactions();
+}
+
+function showConfirmationMessage(message) {
+    const confirmationMessage = document.getElementById('confirmationMessage');
+    confirmationMessage.innerText = message;
+    setTimeout(() => {
+        confirmationMessage.innerText = '';
+    }, 3000);
+}
+
+function importFromExcel() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    if (!file) {
+        document.getElementById('importMessage').textContent = 'Silakan pilih file untuk diimpor.';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        let importErrors = [];
+
+        jsonData.forEach((row, index) => {
+            if (index > 0) {
+                const [description, amount, type] = row;
+                if (description && amount) {
+                    const transactionType = type.toLowerCase();
+                    if (transactionType === 'pemasukan' || transactionType === 'pengeluaran') {
+                        const transaction = {
+                            date: new Date().toLocaleDateString('id-ID'),
+                            description: description,
+                            amount: parseFloat(amount),
+                            type: transactionType === 'pemasukan' ? 'income' : 'expense',
+                        };
+
+                        const transactionStore = db.transaction([storeName], "readwrite").objectStore(storeName);
+                        transactionStore.add(transaction);
+                    } else {
+                        importErrors.push(`Tipe '${type}' tidak valid pada baris ${index + 1}.`);
+                    }
+                } else {
+                    importErrors.push(`Baris ${index + 1} tidak lengkap.`);
+                }
+            }
+        });
+
+        if (importErrors.length === 0) {
+            document.getElementById('importMessage').textContent = 'Transaksi berhasil diimpor!';
+            document.getElementById('importMessage').style.color = 'green';
+        } else {
+            document.getElementById('importMessage').textContent = importErrors.join(' | ');
+            document.getElementById('importMessage').style.color = 'red';
+        }
+
+        renderTransactions(); // Render ulang setelah impor
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+function exportToExcel() {
+    const transactionStore = db.transaction([storeName]).objectStore(storeName);
+    const request = transactionStore.getAll();
+
+    request.onsuccess = () => {
+        const transactions = request.result;
+        const wb = XLSX.utils.book_new();
+        const wsIncome = XLSX.utils.json_to_sheet(transactions.filter(t => t.type === 'income'));
+        const wsExpense = XLSX.utils.json_to_sheet(transactions.filter(t => t.type === 'expense'));
+
+        XLSX.utils.book_append_sheet(wb, wsIncome, "Pemasukan");
+        XLSX.utils.book_append_sheet(wb, wsExpense, "Pengeluaran");
+
+        // Simpan file Excel
+        XLSX.writeFile(wb, "Transaksi.xlsx");
+    };
+}
+
+// Inisialisasi IndexedDB saat halaman dimuat
+window.onload = function() {
+    initIndexedDB();
+};
+    </script>
+    
+    
+</body>
+</html>
+
